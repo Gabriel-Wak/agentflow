@@ -16,11 +16,27 @@ Times de agentes **Claude** que criam, validam e aprovam — montados visualment
 
 Tokens e senhas são criptografados com AES-256-GCM antes de ir para o banco.
 
-## Configuração
+## Rodar localmente (recomendado para desenvolver)
 
-1. Crie um projeto no [Supabase](https://supabase.com) e rode `supabase/schema.sql` no **SQL Editor**.
+Requisitos: Node 20+ e Docker.
+
+```bash
+npm install
+npx supabase start          # sobe Postgres + Auth locais e aplica supabase/migrations
+cp .env.example .env.local  # preencha com a URL/ANON_KEY que o comando acima mostra
+npm run dev -- -p 3001      # http://localhost:3001
+```
+
+- Painel do banco (Supabase Studio): http://127.0.0.1:54323
+- E-mails de confirmação/login (Mailpit): http://127.0.0.1:54324
+- Parar: `npx supabase stop` (os dados ficam salvos) · zerar o banco: `npx supabase db reset`
+- Mudou o banco? Crie um arquivo novo em `supabase/migrations/` e rode `npx supabase db reset`.
+
+## Configuração em produção
+
+1. Crie um projeto no [Supabase](https://supabase.com) e rode `supabase/migrations/*.sql` no **SQL Editor** (ou `npx supabase db push`).
 2. (Opcional) Login com GitHub: Supabase → Authentication → Providers → GitHub.
-3. Em Authentication → URL Configuration, adicione `https://SEU-DOMINIO/auth/callback` (e `http://localhost:3000/auth/callback`).
+3. Em Authentication → URL Configuration, adicione `https://SEU-DOMINIO/auth/callback`.
 4. Copie `.env.example` para `.env.local` e preencha:
 
 | Variável | Descrição |
@@ -29,11 +45,6 @@ Tokens e senhas são criptografados com AES-256-GCM antes de ir para o banco.
 | `ANTHROPIC_API_KEY` | Chave da API da Claude |
 | `ANTHROPIC_MODEL` | Padrão `claude-opus-5-5` |
 | `ENCRYPTION_KEY` | `openssl rand -base64 32` — não troque depois, ou os segredos salvos deixam de abrir |
-
-```bash
-npm install
-npm run dev   # http://localhost:3000
-```
 
 ## Deploy na Vercel
 
