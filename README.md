@@ -16,6 +16,27 @@ Times de agentes **Claude** que criam, validam e aprovam — montados visualment
 
 Tokens e senhas são criptografados com AES-256-GCM antes de ir para o banco.
 
+## Orquestra (agentes de verdade no seu computador)
+
+A tela **Orquestra** (`/orquestra`) é um canvas infinito onde cada agente é um **terminal real** — Claude Code, Codex ou shell — rodando na sua máquina. Ligue um terminal ao outro e eles conversam sozinhos.
+
+```bash
+npm run orquestra   # daemon local: abre os terminais e faz a ponte entre os agentes
+```
+
+Abra o link que ele imprime (`http://localhost:3001/orquestra#token=...`).
+
+- **Ligações = permissões**: um agente só fala com quem está ligado a ele no canvas.
+- **Ferramentas MCP dos agentes** (servidor `orquestra`, configurado automaticamente no Claude Code):
+  `listar_agentes`, `enviar_mensagem`, `ler_terminal`, `escrever_nota`, `ler_notas`.
+- **Compositor com @menção**: `@Criador implemente X` digita a mensagem no terminal do Criador.
+- **Trio**: cria Criador → Validador → Aprovador (Claude Code) já ligados em ciclo.
+- **Notas**: os agentes escrevem progresso e decisões em notas no canvas.
+- **Partituras**: salve a formação (agentes, papéis, notas, ligações) e reuse; ficam em `~/.agentflow/partituras`.
+- **Pasta do projeto**: escolha no topo da tela; os agentes novos abrem nela. Na primeira vez numa pasta, o Claude Code pergunta se você confia nela — responda no próprio terminal.
+
+Segurança: o daemon só escuta em `127.0.0.1`, exige o token de `~/.agentflow/orquestra-token`, aceita apenas origens conhecidas (`ORQUESTRA_ORIGINS` para adicionar seu domínio) e cada agente recebe uma chave MCP própria. Qualquer CLI com MCP pode usar a variável `ORQUESTRA_MCP_URL` disponível dentro de cada terminal.
+
 ## Rodar localmente (recomendado para desenvolver)
 
 Requisitos: Node 20+ e Docker.
@@ -53,6 +74,7 @@ Importe o repositório na Vercel, cadastre as mesmas variáveis de ambiente e fa
 ## Arquitetura
 
 ```
+orquestra/daemon.ts              # daemon local: PTYs, WebSocket e servidor MCP dos agentes
 src/
 ├── proxy.ts                     # sessão Supabase + proteção das rotas
 ├── app/
@@ -60,6 +82,7 @@ src/
 │   ├── login/  auth/            # login, callback OAuth, sair
 │   └── api/                     # connections, agents, prompts, flows, flows/[id]/run
 ├── components/flow/             # editor React Flow, nós, inspetor, painel de execução
+├── components/orquestra/        # canvas da Orquestra: terminais xterm, notas, compositor, partituras
 └── lib/
     ├── orchestrator.ts          # executa o time: ordem topológica, ferramentas, loop de revisão
     ├── integrations/            # github.ts, database.ts, mcp.ts

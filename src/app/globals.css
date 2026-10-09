@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@xyflow/react/dist/style.css";
+@import "@xterm/xterm/css/xterm.css";
 
 :root {
   --bg: #0b0d12;

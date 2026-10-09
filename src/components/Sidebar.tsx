@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot, Database, GitBranch, LayoutDashboard, LogOut, Menu, Plug, Sparkles, Workflow, X } from "lucide-react";
+import { Bot, Database, GitBranch, LayoutDashboard, LogOut, Menu, Music, Plug, Sparkles, Workflow, X } from "lucide-react";
 import { useState } from "react";
 
 const NAV = [
   { href: "/dashboard", label: "Painel", icon: LayoutDashboard },
+  { href: "/orquestra", label: "Orquestra", icon: Music },
   { href: "/flows", label: "Times de agentes", icon: Workflow },
   { href: "/agents", label: "Meus agentes", icon: Bot },
   { href: "/prompts", label: "Prompts", icon: Sparkles },
