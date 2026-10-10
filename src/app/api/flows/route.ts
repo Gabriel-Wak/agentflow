@@ -1,4 +1,5 @@
-import { fail, json, withUser } from "@/lib/api";
+import { z } from "zod";
+import { fail, json, readBody, withUser } from "@/lib/api";
 import { defaultFlow } from "@/lib/flow-template";
 
 export const GET = withUser(async ({ supabase }) => {
@@ -11,7 +12,7 @@ export const GET = withUser(async ({ supabase }) => {
 });
 
 export const POST = withUser(async ({ supabase }, req) => {
-  const b = (await req.json().catch(() => ({}))) as { name?: string };
+  const b = await readBody(req, z.object({ name: z.string().max(200).optional() }).catch({}));
   const tpl = defaultFlow();
   const { data, error } = await supabase
     .from("flows")

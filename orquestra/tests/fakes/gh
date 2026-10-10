@@ -1,0 +1,18 @@
+#!/bin/sh
+# gh falso: só "repo list" e "auth git-credential".
+S="${FAKE_STATE:-/tmp}"
+printf 'gh\t%s\t%s\n' "$PWD" "$*" >> "$S/log" 2>/dev/null
+if [ "$1" = "auth" ] && [ "$2" = "git-credential" ]; then cat >/dev/null; exit 0; fi
+if [ "$1" = "repo" ] && [ "$2" = "list" ]; then
+  if [ -e "$S/gh-fora" ]; then echo "error connecting to api.github.com" >&2; exit 1; fi
+  if [ -e "$S/repos.json" ]; then cat "$S/repos.json"; exit 0; fi
+  cat <<'JSON'
+[{"name":"always-ticket","defaultBranchRef":{"name":"main"},"isArchived":false,"pushedAt":"2026-10-10T18:00:00Z"},
+ {"name":"central_de_sustentacao","defaultBranchRef":{"name":"master"},"isArchived":false,"pushedAt":"2026-10-10T17:00:00Z"},
+ {"name":"projeto-antigo","defaultBranchRef":{"name":"main"},"isArchived":true,"pushedAt":"2020-01-01T00:00:00Z"},
+ {"name":"repo-vazio","defaultBranchRef":null,"isArchived":false,"pushedAt":null},
+ {"name":"..","defaultBranchRef":{"name":"main"},"isArchived":false,"pushedAt":null}]
+JSON
+  exit 0
+fi
+echo "gh falso: comando não suportado: $*" >&2; exit 2

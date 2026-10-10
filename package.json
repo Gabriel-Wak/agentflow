@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "orquestra": "tsx orquestra/daemon.ts"
+    "orquestra": "tsx orquestra/daemon.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "node --import tsx --test \"src/lib/__tests__/*.test.ts\"",
+    "test:orquestra": "tsx --test orquestra/tests/daemon.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
@@ -15,6 +18,7 @@
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.3",
     "@xterm/addon-fit": "^0.11.0",
+    "@xterm/headless": "^6.0.0",
     "@xterm/xterm": "^6.0.0",
     "@xyflow/react": "^12.12.0",
     "lucide-react": "^1.54.0",

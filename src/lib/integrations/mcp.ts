@@ -11,7 +11,7 @@ export async function testMcp(url: string, token: string) {
   const errors: string[] = [];
 
   for (const kind of ["http", "sse"] as const) {
-    const client = new Client({ name: "agentflow", version: "1.0.0" });
+    const client = new Client({ name: "always-flow", version: "1.0.0" });
     try {
       const transport =
         kind === "http"

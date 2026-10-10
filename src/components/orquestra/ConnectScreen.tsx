@@ -3,18 +3,20 @@
 import { useState } from "react";
 import { Loader2, Music } from "lucide-react";
 import { Button, Card, Input, Label } from "../ui";
-import type { useDaemonConnection } from "./daemon";
+import type { DaemonConnection } from "./daemon";
 
-export default function ConnectScreen({ conn }: { conn: ReturnType<typeof useDaemonConnection> }) {
+export default function ConnectScreen({ conn }: { conn: DaemonConnection }) {
   const [token, setToken] = useState(conn.token);
   const [url, setUrl] = useState(conn.url);
-  const trying = conn.token && conn.state !== "open";
+  const rejected = conn.state === "rejected";
+  const trying = Boolean(conn.token) && !rejected && conn.state !== "open";
 
   return (
     <div className="mx-auto max-w-2xl p-4 sm:p-8">
       <div className="mb-6 flex items-start gap-3">
         <div className="rounded-lg bg-accent/15 p-2 text-accent"><Music className="h-5 w-5" /></div>
         <div>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-accent">Always Flow</p>
           <h1 className="text-xl font-semibold">Orquestra de agentes</h1>
           <p className="mt-1 text-sm text-muted">
             Claude Code, Codex e terminais rodando de verdade na sua máquina, lado a lado num canvas infinito. Ligue um agente ao outro e eles conversam sozinhos.
@@ -42,7 +44,12 @@ export default function ConnectScreen({ conn }: { conn: ReturnType<typeof useDae
             {trying ? <><Loader2 className="h-4 w-4 animate-spin" /> Tentando conectar...</> : "Conectar"}
           </Button>
           {trying && conn.state === "closed" && (
-            <p className="text-xs text-warn">Sem resposta do daemon. Confira se <code>npm run orquestra</code> está rodando e se o token está certo.</p>
+            <p role="status" className="text-xs text-warn">Sem resposta do daemon. Confira se <code>npm run orquestra</code> está rodando neste endereço; tentando de novo sozinho.</p>
+          )}
+          {rejected && (
+            <p role="alert" className="text-xs text-bad">
+              O daemon recusou a conexão: o token não confere (copie de novo o link que ele imprime) ou esta página não está nas origens permitidas (<code>ORQUESTRA_ORIGINS</code>). Confira também se o endereço começa com <code>ws://</code>.
+            </p>
           )}
         </form>
       </Card>

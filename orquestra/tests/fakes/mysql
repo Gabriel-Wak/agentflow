@@ -1,0 +1,18 @@
+#!/bin/sh
+# mysql falso: responde conforme palavras na consulta (veja README.md).
+S="${FAKE_STATE:-/tmp}"
+printf 'mysql\t%s\t%s\n' "$PWD" "$*" >> "$S/log" 2>/dev/null
+q=""; while [ $# -gt 0 ]; do [ "$1" = "-e" ] && { q="$2"; shift; }; shift; done
+if [ -e "$S/mysql-sem-perfil" ]; then echo "ERROR 2002 (HY000): Can't connect to local MySQL server through socket '/tmp/mysql.sock' (2)" >&2; exit 1; fi
+if [ -e "$S/mysql-fora" ]; then echo "mysql: [Warning] Using a password on the command line interface can be insecure." >&2; echo "ERROR 2003 (HY000): Can't connect to MySQL server on 'replica' (110)" >&2; exit 1; fi
+case "$q" in
+  "SELECT 1") echo 1 ;;
+  *lento*) sleep 60 ;;
+  *erro*) echo "ERROR 1064 (42000) at line 1: You have an error in your SQL syntax" >&2; exit 1 ;;
+  *grande*) echo "n"; i=1; while [ $i -le 500 ]; do echo $i; i=$((i+1)); done ;;
+  *clientes*)
+    printf 'id\tnome\tcpf\temail\ttelefone\tendereco\tnumero_endereco\tbairro\tcep\trecepcao\tobs\n'
+    printf '1\tJoão\t123.456.789-00\tjoao@exemplo.com\t(11) 98765-4321\tRua das Flores\t123\tCentro\t01310-100\tsim\tligar para 11 91234-5678 ou maria@ex.com.br, cpf 98765432100, entregar no CEP 04567-890\n'
+    printf '2\tAna\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tNULL\tnao\tpedido 12345 sem dados\n' ;;
+  *) printf 'ok\n1\n' ;;
+esac

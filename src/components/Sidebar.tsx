@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot, Database, GitBranch, LayoutDashboard, LogOut, Menu, Music, Plug, Sparkles, Workflow, X } from "lucide-react";
+import { Bot, Building2, Database, GitBranch, LayoutDashboard, LogOut, Menu, Music, Plug, Sparkles, Workflow, X } from "lucide-react";
 import { useState } from "react";
 
 const NAV = [
   { href: "/dashboard", label: "Painel", icon: LayoutDashboard },
   { href: "/orquestra", label: "Orquestra", icon: Music },
+  { href: "/orquestra?painel=alwaysfit", label: "Always Fit", icon: Building2 },
   { href: "/flows", label: "Times de agentes", icon: Workflow },
   { href: "/agents", label: "Meus agentes", icon: Bot },
   { href: "/prompts", label: "Prompts", icon: Sparkles },
@@ -24,7 +25,7 @@ export default function Sidebar({ email }: { email: string }) {
   const nav = (
     <nav className="flex h-full flex-col gap-1 p-3">
       <Link href="/dashboard" className="mb-4 flex items-center gap-2 px-2 pt-2 font-semibold">
-        <Workflow className="h-5 w-5 text-accent" /> AgentFlow
+        <Workflow className="h-5 w-5 text-accent" /> Always Flow
       </Link>
       {NAV.map((item) =>
         "section" in item ? (
@@ -57,7 +58,7 @@ export default function Sidebar({ email }: { email: string }) {
     <>
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 border-r border-line bg-panel md:block">{nav}</aside>
       <div className="flex items-center justify-between border-b border-line bg-panel px-4 py-3 md:hidden">
-        <span className="flex items-center gap-2 font-semibold"><Workflow className="h-5 w-5 text-accent" /> AgentFlow</span>
+        <span className="flex items-center gap-2 font-semibold"><Workflow className="h-5 w-5 text-accent" /> Always Flow</span>
         <button onClick={() => setOpen(true)} aria-label="Abrir menu"><Menu className="h-5 w-5" /></button>
       </div>
       {open && (

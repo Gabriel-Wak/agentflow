@@ -24,7 +24,7 @@ async function gh<T>(path: string, token: string, accept = "application/vnd.gith
     headers: {
       Accept: accept,
       "X-GitHub-Api-Version": "2022-11-28",
-      "User-Agent": "agentflow",
+      "User-Agent": "always-flow",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     cache: "no-store",

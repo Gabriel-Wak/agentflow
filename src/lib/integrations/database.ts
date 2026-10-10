@@ -26,15 +26,23 @@ async function withClient<T>(connectionString: string, fn: (c: Client) => Promis
 export async function testDatabase(connectionString: string) {
   return withClient(connectionString, async (c) => {
     const v = await c.query<{ version: string }>("select version()");
+    // Superusuário burla parte da proteção (ex.: COPY TO PROGRAM, dblink): avisamos na tela da conexão.
+    const role = await c.query<{ rolsuper: boolean; rolcreaterole: boolean }>(
+      "select rolsuper, rolcreaterole from pg_roles where rolname = current_user",
+    ).catch(() => ({ rows: [] as { rolsuper: boolean; rolcreaterole: boolean }[] }));
     const t = await c.query<{ table_schema: string; table_name: string }>(
       `select table_schema, table_name from information_schema.tables
        where table_schema not in ('pg_catalog', 'information_schema')
          and table_schema not like 'pg_%'
        order by table_schema, table_name limit 200`,
     );
+    const r = role.rows[0];
     return {
       version: v.rows[0]?.version.split(",")[0] ?? "",
       tables: t.rows.map((r) => `${r.table_schema}.${r.table_name}`),
+      ...(r?.rolsuper || r?.rolcreaterole
+        ? { warning: "Este usuário do banco é administrador. Para os agentes, prefira um usuário só de leitura (GRANT SELECT)." }
+        : {}),
     };
   });
 }
@@ -74,8 +82,35 @@ export async function describeSchema(connectionString: string, table?: string) {
   });
 }
 
+const READ_STATEMENTS = /^(select|with|explain|show|values|table)\b/i;
+/**
+ * Funções/comandos que escapam da transação READ ONLY (outra conexão, sistema de arquivos, processos)
+ * ou mexem no servidor. É uma segunda camada: a principal é o READ ONLY + um usuário só de leitura.
+ */
+const DANGEROUS = /\b(copy|dblink\w*|lo_\w+|pg_(read_\w+|write_\w+|stat_file|ls_\w+|terminate_backend|cancel_backend|reload_conf|rotate_logfile|promote|file_\w+|logical_\w+|create_restore_point|switch_wal|backup_\w+)|set_config|txid_current|nextval|setval)\s*\(?/i;
+
+/** Tira comentários e literais para analisar só a estrutura do comando. */
+function skeleton(sql: string) {
+  return sql
+    .replace(/--[^\n]*/g, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/\$(\w*)\$[\s\S]*?\$\1\$/g, "''")
+    .replace(/'(?:[^']|'')*'/g, "''")
+    .trim();
+}
+
+/** Valida o SQL antes de ir ao banco. Exportado para teste. */
+export function checkReadOnlySql(sql: string) {
+  const s = skeleton(sql);
+  if (!s) throw new Error("SQL vazio.");
+  if (!READ_STATEMENTS.test(s)) throw new Error("Só consultas de leitura (SELECT, WITH, EXPLAIN, SHOW, VALUES) são permitidas.");
+  const bad = s.match(DANGEROUS);
+  if (bad) throw new Error(`Função ou comando não permitido para os agentes: ${bad[1]}.`);
+}
+
 /** Executa SQL dentro de uma transação READ ONLY — escrita é bloqueada pelo próprio Postgres. */
 export async function readOnlyQuery(connectionString: string, sql: string) {
+  checkReadOnlySql(sql);
   return withClient(connectionString, async (c) => {
     await c.query("begin transaction read only");
     try {

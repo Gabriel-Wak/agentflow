@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 import { anthropic, DEFAULT_MODEL, fallbackParams, reasoningParams } from "./anthropic";
-import { decrypt } from "./crypto";
+import { decryptFor } from "./crypto";
 import { describeSchema, readOnlyQuery } from "./integrations/database";
 import { listFiles, readFile, type GithubConfig } from "./integrations/github";
 import { DEFAULT_ROLE_PROMPTS, isReviewer, parseVerdict } from "./roles";
@@ -171,6 +171,7 @@ async function runClaudeAgent(opts: {
   dbUrl?: string;
   mcp: { name: string; url: string; token: string }[];
   emit: Emit;
+  signal?: AbortSignal;
 }): Promise<string> {
   const { nodeId, emit } = opts;
   const client = anthropic();
@@ -184,6 +185,7 @@ async function runClaudeAgent(opts: {
   let text = "";
 
   for (let turn = 0; turn < MAX_TOOL_TURNS; turn++) {
+    const turnStart = text;
     const stream = client.beta.messages.stream({
       model: opts.model,
       max_tokens: 32000,
@@ -203,7 +205,7 @@ async function runClaudeAgent(opts: {
       ...reasoningParams(opts.model, opts.effort),
       ...("fallbacks" in fb ? { fallbacks: fb.fallbacks } : {}),
       ...(betas.length ? { betas } : {}),
-    });
+    }, { signal: opts.signal });
 
     let msg: Anthropic.Beta.BetaMessage;
     try {
@@ -217,9 +219,14 @@ async function runClaudeAgent(opts: {
       }
       msg = await stream.finalMessage();
     } catch (e) {
-      // JSON inválido em entrada de ferramenta: tenta de novo uma vez sem quebrar o fluxo.
-      if (e instanceof Anthropic.APIError) throw e;
-      if (turn < MAX_TOOL_TURNS - 1) continue;
+      // Erro de API (inclusive cancelamento) sobe; falha de leitura do stream (ex.: JSON de ferramenta
+      // truncado) tenta o mesmo turno de novo, descartando o texto parcial dele.
+      if (e instanceof Anthropic.APIError || opts.signal?.aborted) throw e;
+      if (turn < MAX_TOOL_TURNS - 1) {
+        text = turnStart;
+        emit({ type: "delta", nodeId, text: "\n\n[resposta interrompida — tentando de novo]\n\n" });
+        continue;
+      }
       throw e;
     }
 
@@ -262,15 +269,15 @@ async function runClaudeAgent(opts: {
   return text;
 }
 
-async function runWebhookAgent(agent: AgentRow, payload: Record<string, unknown>): Promise<string> {
+async function runWebhookAgent(agent: AgentRow, payload: Record<string, unknown>, signal?: AbortSignal): Promise<string> {
   const url = agent.config.url;
   if (!url) throw new Error(`Agente "${agent.name}" sem URL de webhook.`);
-  const auth = decrypt(agent.secret);
+  const auth = decryptFor(agent.secret, agent.name);
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(auth ? { Authorization: auth } : {}) },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(120_000),
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000),
   });
   const body = await res.text();
   if (!res.ok) throw new Error(`Webhook ${res.status}: ${body.slice(0, 300)}`);
@@ -314,8 +321,10 @@ export async function runFlow(opts: {
   settings: FlowSettings;
   task?: string;
   emit: Emit;
+  /** Abortado quando o navegador desconecta: paramos de chamar a API. */
+  signal?: AbortSignal;
 }): Promise<{ output: string; approved: boolean }> {
-  const { supabase, nodes, edges, emit } = opts;
+  const { supabase, nodes, edges, emit, signal } = opts;
   const order = executionOrder(nodes, edges);
   if (!order.length) throw new Error("Conecte pelo menos um agente ao nó de Tarefa.");
 
@@ -346,6 +355,7 @@ export async function runFlow(opts: {
   let i = 0;
 
   while (i < order.length) {
+    if (signal?.aborted) throw new Error("Execução cancelada.");
     const node = order[i];
     const d = node.data as AgentNodeData;
     const saved = d.agentId ? agentById.get(d.agentId) : undefined;
@@ -363,7 +373,7 @@ export async function runFlow(opts: {
 
     let output: string;
     if (saved?.kind === "webhook") {
-      output = await runWebhookAgent(saved, { task, role: d.role, node: d.label, round, history, feedback });
+      output = await runWebhookAgent(saved, { task, role: d.role, node: d.label, round, history, feedback }, signal);
       emit({ type: "delta", nodeId: node.id, text: output });
     } else {
       const gh = d.githubId ? connById.get(d.githubId) : undefined;
@@ -371,7 +381,7 @@ export async function runFlow(opts: {
       const mcp = (d.mcpIds ?? [])
         .map((id) => connById.get(id))
         .filter((c): c is ConnRow => Boolean(c))
-        .map((c, idx) => ({ name: slug(c.name, idx), url: c.config.url, token: decrypt(c.secret) }));
+        .map((c, idx) => ({ name: slug(c.name, idx), url: c.config.url, token: decryptFor(c.secret, c.name) }));
 
       const base = saved?.system_prompt || d.systemPrompt || DEFAULT_ROLE_PROMPTS[d.role];
       const ctxNotes = [
@@ -387,10 +397,11 @@ export async function runFlow(opts: {
         userMessage,
         model: saved?.model || d.model || DEFAULT_MODEL,
         effort: d.effort || "medium",
-        github: gh ? { cfg: { repo: gh.config.repo, branch: gh.config.branch }, token: decrypt(gh.secret) } : undefined,
-        dbUrl: db ? decrypt(db.secret) : undefined,
+        github: gh ? { cfg: { repo: gh.config.repo, branch: gh.config.branch }, token: decryptFor(gh.secret, gh.name) } : undefined,
+        dbUrl: db ? decryptFor(db.secret, db.name) : undefined,
         mcp,
         emit,
+        signal,
       });
     }
 

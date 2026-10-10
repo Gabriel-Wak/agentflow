@@ -27,8 +27,16 @@ export function normalizeConfig(kind: ConnectionKind, config: Record<string, str
 /** Testa a conexão de verdade e devolve status + metadados para salvar. */
 export async function testConnection(kind: ConnectionKind, config: Record<string, string>, secret: string) {
   if (kind === "mcp") {
-    if (!/^https:\/\//.test(config.url) && !/^http:\/\/localhost/.test(config.url)) {
-      throw new Error("Informe a URL https:// do servidor MCP remoto.");
+    // Na execução quem conecta é a API da Claude, pela internet: localhost/rede interna nunca funcionaria.
+    let url: URL;
+    try {
+      url = new URL(config.url);
+    } catch {
+      throw new Error("URL do servidor MCP inválida.");
+    }
+    if (url.protocol !== "https:") throw new Error("O servidor MCP precisa ser https:// público — a API da Claude conecta nele pela internet.");
+    if (/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$)/.test(url.hostname) || url.hostname.endsWith(".local")) {
+      throw new Error("Endereços locais não funcionam: a API da Claude conecta no servidor MCP pela internet.");
     }
     const r = await testMcp(config.url, secret);
     return { config, meta: r };

@@ -5,7 +5,8 @@
 const MODEL_ALIASES: Record<string, string> = {
   opus: "claude-opus-5-5",
   sonnet: "claude-sonnet-5-5",
-  haiku: "claude-haiku-4-5",
+  haiku: "claude-haiku-5-5",
+  fable: "claude-fable-5-1",
 };
 
 export function parseAgentMarkdown(md: string) {

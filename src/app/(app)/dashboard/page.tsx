@@ -34,8 +34,11 @@ export default async function Dashboard() {
     { done: mcp > 0, text: "Adicione um servidor MCP", href: "/connections/mcp" },
     { done: flows > 0, text: "Crie um time Criador → Validador → Aprovador", href: "/flows" },
   ];
-  const tone = (s: string) => (s === "approved" ? "ok" : s === "rejected" || s === "error" ? "bad" : "warn") as "ok" | "bad" | "warn";
-  const statusLabel: Record<string, string> = { approved: "aprovado", rejected: "reprovado", error: "erro", running: "rodando" };
+  const tone = (s: string) => (s === "approved" ? "ok" : s === "rejected" || s === "error" ? "bad" : s === "cancelled" || s === "stale" ? "muted" : "warn") as "ok" | "bad" | "warn" | "muted";
+  const statusLabel: Record<string, string> = { approved: "aprovado", rejected: "reprovado", error: "erro", running: "rodando", cancelled: "cancelada", stale: "interrompida" };
+  // A execução vive no máximo 300 s no servidor: "rodando" há mais que isso morreu no caminho.
+  const loadedAt = new Date().getTime();
+  const shown = (r: { status: string; created_at: string }) => (r.status === "running" && loadedAt - new Date(r.created_at).getTime() > 6 * 60_000 ? "stale" : r.status);
 
   return (
     <div className="mx-auto max-w-6xl p-4 sm:p-8">
@@ -73,7 +76,7 @@ export default async function Dashboard() {
               {runs.data.map((r) => (
                 <li key={r.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                   <Link href={`/flows/${r.flow_id}`} className="truncate hover:text-accent">{r.task}</Link>
-                  <Badge tone={tone(r.status)}>{statusLabel[r.status] ?? r.status}</Badge>
+                  <Badge tone={tone(shown(r))}>{statusLabel[shown(r)] ?? r.status}</Badge>
                 </li>
               ))}
             </ul>

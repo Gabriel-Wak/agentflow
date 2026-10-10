@@ -18,10 +18,26 @@ export function encrypt(plain: string): string {
 
 export function decrypt(payload: string | null | undefined): string {
   if (!payload) return "";
-  const [iv, tag, data] = payload.split(".").map((p) => Buffer.from(p, "base64"));
+  const parts = payload.split(".");
+  if (parts.length !== 3) throw new Error("Segredo salvo em formato inválido.");
+  const [iv, tag, data] = parts.map((p) => Buffer.from(p, "base64"));
   const decipher = createDecipheriv("aes-256-gcm", key(), iv);
   decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
+  try {
+    return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
+  } catch {
+    // Falha de autenticação do GCM: quase sempre a ENCRYPTION_KEY mudou depois que o segredo foi salvo.
+    throw new Error("Não consegui abrir um segredo salvo — a ENCRYPTION_KEY mudou? Cadastre a conexão/agente de novo.");
+  }
+}
+
+/** Como `decrypt`, mas diz de qual conexão/agente é o segredo que falhou. */
+export function decryptFor(payload: string | null | undefined, owner: string): string {
+  try {
+    return decrypt(payload);
+  } catch (e) {
+    throw new Error(`"${owner}": ${(e as Error).message}`);
+  }
 }
 
 export function mask(secret: string): string {

@@ -1,14 +1,15 @@
 import { anthropic, DEFAULT_MODEL, fallbackParams, reasoningParams } from "@/lib/anthropic";
-import { fail, ndjsonStream, withUser } from "@/lib/api";
+import { z } from "zod";
+import { fail, ndjsonStream, readBody, withUser } from "@/lib/api";
 import { IMPROVER_SYSTEM, PROMPT_TARGETS, type PromptTarget } from "@/lib/prompt-improver";
 
 export const maxDuration = 300;
 
 export const POST = withUser(async (_ctx, req) => {
-  const b = (await req.json()) as { prompt?: string; target?: PromptTarget; context?: string };
+  const b = await readBody(req, z.object({ prompt: z.string().max(200_000).optional(), target: z.string().optional(), context: z.string().max(50_000).optional() }));
   const prompt = b.prompt?.trim();
   if (!prompt) return fail("Escreva o prompt que você quer melhorar.");
-  const target = PROMPT_TARGETS[b.target ?? "chat"] ?? PROMPT_TARGETS.chat;
+  const target = PROMPT_TARGETS[(b.target ?? "chat") as PromptTarget] ?? PROMPT_TARGETS.chat;
 
   const user = [
     `Destino do prompt: ${target}`,
@@ -16,7 +17,7 @@ export const POST = withUser(async (_ctx, req) => {
     `Prompt original:\n<original>\n${prompt}\n</original>`,
   ].filter(Boolean).join("\n\n");
 
-  return ndjsonStream(async (emit) => {
+  return ndjsonStream(async (emit, signal) => {
     const model = DEFAULT_MODEL;
     const fb = fallbackParams(model);
     const stream = anthropic().beta.messages.stream({
@@ -27,7 +28,7 @@ export const POST = withUser(async (_ctx, req) => {
       ...reasoningParams(model, "medium"),
       ...("fallbacks" in fb ? { fallbacks: fb.fallbacks } : {}),
       ...(fb.betas.length ? { betas: fb.betas } : {}),
-    });
+    }, { signal });
     for await (const ev of stream) {
       if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") {
         emit({ type: "delta", text: ev.delta.text });
@@ -36,5 +37,5 @@ export const POST = withUser(async (_ctx, req) => {
     const msg = await stream.finalMessage();
     if (msg.stop_reason === "refusal") emit({ type: "error", message: "O modelo recusou este pedido." });
     emit({ type: "done" });
-  });
+  }, req.signal);
 });

@@ -14,15 +14,15 @@ export default function Home() {
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-10 sm:px-6">
       <header className="flex items-center justify-between">
-        <div className="flex items-center gap-2 font-semibold"><Workflow className="h-5 w-5 text-accent" /> AgentFlow</div>
+        <div className="flex items-center gap-2 font-semibold"><Workflow className="h-5 w-5 text-accent" /> Always Flow</div>
         <Link href="/login" className="rounded-lg border border-line px-4 py-2 text-sm hover:border-accent">Entrar</Link>
       </header>
       <section className="py-20 text-center">
         <h1 className="mx-auto max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
-          Times de agentes <span className="text-accent">Claude</span> que criam, validam e aprovam.
+          Agentes <span className="text-accent">Claude</span> trabalhando 24 horas pela Always Fit.
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-muted">
-          Monte o fluxo no canvas, ligue MCP, banco de dados e GitHub, e veja três agentes trabalhando juntos em tempo real.
+          Uma orquestra de agentes ligada aos repositórios e ao banco da Always Fit: vigiam incidentes, chamados e pedidos, analisam o código e entregam relatórios — sem mexer em nada.
         </p>
         <Link href="/login" className="mt-8 inline-flex rounded-lg bg-accent px-6 py-3 font-medium text-white hover:brightness-110">Começar agora</Link>
       </section>

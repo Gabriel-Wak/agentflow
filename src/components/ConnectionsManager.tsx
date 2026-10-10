@@ -51,6 +51,7 @@ function Details({ c }: { c: Connection }) {
     return (
       <div className="space-y-2">
         <p className="text-xs text-muted">{String(m.version || "")} · {tables.length} tabela(s) · {c.secret_hint}</p>
+        {m.warning ? <p className="rounded-md border border-warn/30 bg-warn/10 px-2 py-1 text-xs text-warn">{String(m.warning)}</p> : null}
         <div className="flex flex-wrap gap-1.5">
           {tables.slice(0, 30).map((t) => <span key={t} className="rounded bg-panel-2 px-1.5 py-0.5 font-mono text-[11px] text-muted">{t}</span>)}
         </div>
@@ -114,8 +115,12 @@ export default function ConnectionsManager({ kind }: { kind: ConnectionKind }) {
 
   async function remove(id: string) {
     if (!confirm("Remover esta conexão? Os agentes que a usam perdem o acesso.")) return;
-    await api(`/api/connections/${id}`, { method: "DELETE" });
-    setItems((prev) => prev?.filter((c) => c.id !== id) ?? null);
+    try {
+      await api(`/api/connections/${id}`, { method: "DELETE" });
+      setItems((prev) => prev?.filter((c) => c.id !== id) ?? null);
+    } catch (err) {
+      setError((err as Error).message);
+    }
   }
 
   return (
@@ -164,10 +169,10 @@ export default function ConnectionsManager({ kind }: { kind: ConnectionKind }) {
                   </Badge>
                 </div>
                 <div className="flex gap-1">
-                  <Button variant="ghost" className="px-2" title="Testar de novo" onClick={() => retest(c.id)} disabled={busy === c.id}>
+                  <Button variant="ghost" className="px-2" title="Testar de novo" aria-label={`Testar de novo ${c.name}`} onClick={() => retest(c.id)} disabled={busy === c.id}>
                     <RefreshCw className={`h-4 w-4 ${busy === c.id ? "animate-spin" : ""}`} />
                   </Button>
-                  <Button variant="danger" className="px-2" title="Remover" onClick={() => remove(c.id)}><Trash2 className="h-4 w-4" /></Button>
+                  <Button variant="danger" className="px-2" title="Remover" aria-label={`Remover ${c.name}`} onClick={() => remove(c.id)}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </div>
               <Details c={c} />

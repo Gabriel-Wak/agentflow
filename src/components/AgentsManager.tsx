@@ -56,9 +56,13 @@ export default function AgentsManager() {
   }
 
   async function remove(id: string) {
-    if (!confirm("Remover este agente?")) return;
-    await api(`/api/agents/${id}`, { method: "DELETE" });
-    setItems((p) => p?.filter((a) => a.id !== id) ?? null);
+    if (!confirm("Remover este agente? Os fluxos que o usam passam a usar a configuração do próprio nó.")) return;
+    try {
+      await api(`/api/agents/${id}`, { method: "DELETE" });
+      setItems((p) => p?.filter((a) => a.id !== id) ?? null);
+    } catch (err) {
+      setError((err as Error).message);
+    }
   }
 
   return (

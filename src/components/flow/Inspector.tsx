@@ -72,6 +72,14 @@ export default function Inspector({
   const dbs = connections.filter((c) => c.kind === "database");
   const repos = connections.filter((c) => c.kind === "github");
   const saved = agents.find((a) => a.id === d.agentId);
+  // Referências a coisas apagadas depois: o fluxo roda sem elas, então avisamos aqui.
+  const missing = [
+    d.agentId && !saved && "o agente salvo",
+    d.githubId && !repos.some((c) => c.id === d.githubId) && "o repositório GitHub",
+    d.databaseId && !dbs.some((c) => c.id === d.databaseId) && "o banco de dados",
+    (d.mcpIds ?? []).some((id) => !mcps.some((c) => c.id === id)) && "um servidor MCP",
+  ].filter(Boolean);
+  const legacyModel = !MODELS.some((m) => m.id === d.model);
 
   return (
     <div className="space-y-4 p-5">
@@ -79,6 +87,11 @@ export default function Inspector({
         <h3 className="font-medium">Agente</h3>
         <Button variant="danger" className="px-2 py-1 text-xs" onClick={() => onDelete(node.id)}><Trash2 className="h-3.5 w-3.5" /> Remover</Button>
       </div>
+      {missing.length > 0 && (
+        <p className="rounded-lg border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn">
+          Foi removido {missing.join(", ")} que este agente usava. Escolha de novo abaixo — sem isso ele roda sem essa ferramenta.
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label>Nome</Label>
@@ -116,11 +129,12 @@ export default function Inspector({
               <Label>Modelo</Label>
               <Select value={d.model} onChange={(e) => set({ model: e.target.value })}>
                 {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                {legacyModel && <option value={d.model}>{d.model} (anterior)</option>}
               </Select>
             </div>
             <div>
               <Label>Esforço</Label>
-              <Select value={d.effort} onChange={(e) => set({ effort: e.target.value })} disabled={d.model.startsWith("claude-haiku")}>
+              <Select value={d.effort} onChange={(e) => set({ effort: e.target.value })} disabled={/^claude-haiku-4/.test(d.model)} title={/^claude-haiku-4/.test(d.model) ? "Haiku 4.5 não aceita nível de esforço" : undefined}>
                 {EFFORTS.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
               </Select>
             </div>

@@ -14,6 +14,7 @@ import {
   type Connection as RFConnection,
   type Edge,
   type Node,
+  type NodeChange,
 } from "@xyflow/react";
 import { ArrowLeft, Check, Loader2, Play, Save, Square } from "lucide-react";
 import { api, readNdjson } from "@/lib/fetcher";
@@ -51,7 +52,8 @@ export default function FlowEditor({ id }: { id: string }) {
   const [entries, setEntries] = useState<RunEntry[]>([]);
   const [final, setFinal] = useState<{ output: string; approved: boolean } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const firstLoad = useRef(true);
+  /** Estrutura do fluxo como está no banco; "não salvo" = estrutura atual diferente desta. */
+  const savedKey = useRef<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -71,30 +73,48 @@ export default function FlowEditor({ id }: { id: string }) {
       .catch((e) => setError(e.message));
   }, [id, setNodes, setEdges]);
 
-  // Marca como "não salvo" quando algo muda (exceto mudanças de status de execução).
+  // Marca como "não salvo" quando a estrutura difere da salva (status de execução não conta).
   const structureKey = useMemo(() => JSON.stringify([clean(nodes), edges.map((e) => [e.source, e.target]), name, settings]), [nodes, edges, name, settings]);
   useEffect(() => {
     if (!loaded) return;
-    if (firstLoad.current) {
-      firstLoad.current = false;
-      return;
-    }
-    setSaveState("dirty");
+    savedKey.current ??= structureKey;
+    setSaveState((s) => (s === "saving" ? s : structureKey === savedKey.current ? "saved" : "dirty"));
   }, [structureKey, loaded]);
 
   const save = useCallback(async () => {
+    const key = structureKey;
     setSaveState("saving");
     try {
       await api(`/api/flows/${id}`, {
         method: "PUT",
-        body: JSON.stringify({ name, nodes: clean(nodes), edges: edges.map(({ id, source, target, sourceHandle, targetHandle }) => ({ id, source, target, sourceHandle, targetHandle, animated: true })), settings }),
+        body: JSON.stringify({ name: name.trim() || "Sem nome", nodes: clean(nodes), edges: edges.map(({ id, source, target, sourceHandle, targetHandle }) => ({ id, source, target, sourceHandle, targetHandle, animated: true })), settings }),
       });
-      setSaveState("saved");
+      savedKey.current = key;
+      return true;
     } catch (e) {
       setError((e as Error).message);
-      setSaveState("dirty");
+      return false;
+    } finally {
+      // Algo pode ter mudado enquanto salvava.
+      setSaveState(savedKey.current === key ? "saved" : "dirty");
     }
-  }, [id, name, nodes, edges, settings]);
+  }, [id, name, nodes, edges, settings, structureKey]);
+
+  // Não deixa sair com alterações não salvas; e sair no meio da execução cancela no servidor.
+  useEffect(() => {
+    if (saveState === "saved") return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [saveState]);
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  // A Tarefa e a Entrega são a estrutura do fluxo: não podem ser apagadas pelo teclado.
+  const handleNodesChange = useCallback(
+    (changes: NodeChange<Node>[]) =>
+      onNodesChange(changes.filter((c) => c.type !== "remove" || !["task", "output"].includes(nodes.find((n) => n.id === c.id)?.type ?? ""))),
+    [onNodesChange, nodes],
+  );
 
   // Salvamento automático 1,5 s depois da última mudança.
   useEffect(() => {
@@ -140,7 +160,7 @@ export default function FlowEditor({ id }: { id: string }) {
       return;
     }
     setError("");
-    await save();
+    if (saveState !== "saved" && !(await save())) return;
     setRunning(true);
     setTab("run");
     setEntries([]);
@@ -193,6 +213,7 @@ export default function FlowEditor({ id }: { id: string }) {
     } finally {
       setRunning(false);
       abortRef.current = null;
+      setEntries((es) => es.map((e) => (e.finished || e.system ? e : { ...e, interrupted: true })));
       setNodes((ns) => ns.map((n) => ((n.data as { status?: string }).status === "running" ? { ...n, data: { ...n.data, status: "idle" } } : n)));
     }
   }
@@ -239,7 +260,7 @@ export default function FlowEditor({ id }: { id: string }) {
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
-            onNodesChange={onNodesChange}
+            onNodesChange={handleNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeClick={(_, n) => { setSelectedId(n.id); setTab("config"); }}

@@ -1,0 +1,21 @@
+#!/bin/sh
+# git falso: clone/fetch/checkout/clean/log numa pasta, sem rede.
+S="${FAKE_STATE:-/tmp}"
+printf 'git\t%s\t%s\n' "$PWD" "$*" >> "$S/log" 2>/dev/null
+while [ "$1" = "-c" ]; do shift 2; done
+cmd="$1"; shift
+case "$cmd" in
+  clone)
+    for a in "$@"; do case "$a" in -*) ;; *) if [ -z "$url" ]; then url="$a"; else dir="$a"; fi ;; esac; done
+    case "$url" in *falha*) echo "fatal: repository '$url' not found" >&2; exit 128 ;; esac
+    mkdir -p "$dir/.git" && echo "$url" > "$dir/.git/remote" && echo "conteúdo de $url" > "$dir/README.md" ;;
+  fetch) [ -d .git ] || { echo "fatal: not a git repository" >&2; exit 128; } ;;
+  checkout) for a in "$@"; do last="$a"; done; echo "$last" > .git/HEAD-fake ;;
+  clean) rm -f sujeira.txt ;;
+  log)
+    case "$*" in
+      *-15*) printf 'abc1234 2026-10-10 Fulano: corrige pedido travado\ndef5678 2026-10-09 Ciclana: ajusta fila\n' ;;
+      *) echo "abc1234 2026-10-10 Fulano: corrige pedido travado" ;;
+    esac ;;
+  *) echo "git falso: comando não suportado: $cmd" >&2; exit 2 ;;
+esac

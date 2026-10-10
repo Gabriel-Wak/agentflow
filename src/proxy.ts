@@ -32,7 +32,9 @@ export async function proxy(request: NextRequest) {
   if (!data?.claims && !isPublic && !path.startsWith("/api")) {
     const login = request.nextUrl.clone();
     login.pathname = "/login";
-    login.searchParams.set("next", path);
+    // O destino leva a busca original (ex.: ?painel=alwaysfit); a URL do login fica só com ?next=.
+    login.search = "";
+    login.searchParams.set("next", path + request.nextUrl.search);
     return NextResponse.redirect(login);
   }
   if (data?.claims && path === "/login") {

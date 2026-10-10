@@ -1,8 +1,9 @@
+import { z } from "zod";
 import { encrypt } from "@/lib/crypto";
-import { fail, json, withUser } from "@/lib/api";
+import { fail, json, readBody, withUser } from "@/lib/api";
 import { toPublic } from "@/lib/connections";
 import { parseAgentMarkdown } from "@/lib/agent-import";
-import type { AgentKind, AgentRole } from "@/lib/types";
+import { MODELS } from "@/lib/types";
 
 const COLS = "id, name, kind, role, description, system_prompt, model, config, created_at, secret";
 
@@ -12,25 +13,28 @@ export const GET = withUser(async ({ supabase }) => {
   return json((data ?? []).map(toPublic));
 });
 
+const Body = z.object({
+  kind: z.enum(["claude", "claude_code", "webhook"], { message: "tipo de agente inválido" }),
+  name: z.string().max(120).optional(),
+  role: z.enum(["creator", "validator", "approver", "custom"]).optional(),
+  description: z.string().max(2000).optional(),
+  system_prompt: z.string().max(100_000).optional(),
+  model: z.string().max(80).optional(),
+  markdown: z.string().max(200_000).optional(),
+  url: z.string().max(2000).optional(),
+  secret: z.string().max(10_000).optional(),
+});
+
 export const POST = withUser(async ({ supabase }, req) => {
-  const b = (await req.json()) as {
-    kind: AgentKind;
-    name?: string;
-    role?: AgentRole;
-    description?: string;
-    system_prompt?: string;
-    model?: string;
-    markdown?: string;
-    url?: string;
-    secret?: string;
-  };
+  const b = await readBody(req, Body);
+  if (b.model && !MODELS.some((m) => m.id === b.model)) return fail("Modelo desconhecido.");
   let row: Record<string, unknown>;
   if (b.kind === "claude_code") {
     if (!b.markdown?.trim()) return fail("Cole o arquivo .md do subagente.");
     const parsed = parseAgentMarkdown(b.markdown);
     row = { ...parsed, kind: "claude_code", role: b.role ?? "custom", name: b.name?.trim() || parsed.name };
   } else if (b.kind === "webhook") {
-    if (!/^https?:\/\//.test(b.url ?? "")) return fail("Informe a URL do webhook do agente.");
+    if (!/^https?:\/\/[^\s/]+/.test(b.url?.trim() ?? "")) return fail("Informe a URL do webhook do agente (http:// ou https://).");
     row = {
       kind: "webhook",
       name: b.name?.trim(),

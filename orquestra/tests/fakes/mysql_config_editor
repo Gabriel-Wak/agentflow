@@ -1,0 +1,7 @@
+#!/bin/sh
+# mysql_config_editor falso: só "print". A senha aparece mascarada, como no real.
+S="${FAKE_STATE:-/tmp}"
+printf 'mysql_config_editor\t%s\t%s\n' "$PWD" "$*" >> "$S/log" 2>/dev/null
+[ -e "$S/mysql-sem-perfil" ] && exit 0
+lp=$(echo "$2" | sed 's/^--login-path=//')
+printf '[%s]\nuser = "leitura"\npassword = *****\nhost = "replica.exemplo.rds.amazonaws.com"\n' "$lp"

@@ -6,7 +6,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "AgentFlow — times de agentes Claude",
+  title: "Always Flow — agentes da Always Fit",
   description: "Monte times de agentes Claude que criam, validam e aprovam, conectados a MCP, banco de dados e GitHub.",
 };
 

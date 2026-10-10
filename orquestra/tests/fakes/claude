@@ -1,0 +1,15 @@
+#!/bin/sh
+# Claude Code falso: -p responde get_usage e fica pendurado (o daemon tem de matá-lo);
+# interativo pergunta se confia na pasta e, depois do Enter, mostra o banner.
+S="${FAKE_STATE:-/tmp}"
+mkdir -p "$S/pids" 2>/dev/null && echo $$ > "$S/pids/$$"
+if [ "$1" = "-p" ]; then
+  read line
+  echo '{"type":"control_response","response":{"request_id":"orquestra-usage","response":{"subscription_type":"max","rate_limits":{"five_hour":{"utilization":41,"resets_at":"2026-10-10T20:00:00Z"},"seven_day":{"utilization":12,"resets_at":null}}}}}'
+  sleep 120
+  exit 0
+fi
+echo "Do you trust this folder?"
+read ans
+echo "Claude Code v9.9.9"
+while IFS= read -r l; do echo "got:$l"; done

@@ -12,6 +12,8 @@ export interface RunEntry {
   tools: string[];
   verdict?: "approved" | "rejected";
   finished?: boolean;
+  /** A execução parou (cancelada ou erro) antes deste agente terminar. */
+  interrupted?: boolean;
   system?: boolean;
 }
 
@@ -27,8 +29,11 @@ export default function RunPanel({
   const endRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
 
+  // Acompanha o fim só se a pessoa já estava lá embaixo — não arranca a leitura de quem rolou para cima.
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
+    const box = endRef.current?.closest(".overflow-y-auto");
+    if (!box) return;
+    if (box.scrollHeight - box.scrollTop - box.clientHeight < 160) box.scrollTop = box.scrollHeight;
   }, [entries, final]);
 
   if (!entries.length && !running) {
@@ -44,7 +49,9 @@ export default function RunPanel({
           <div key={i} className="rounded-lg border border-line bg-panel-2">
             <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
               <span className="text-sm font-medium">{e.label}{e.round > 1 && <span className="ml-1 text-xs text-muted">· rodada {e.round}</span>}</span>
-              {!e.finished ? (
+              {e.interrupted ? (
+                <Badge tone="warn">interrompido</Badge>
+              ) : !e.finished ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-warn" />
               ) : e.verdict === "approved" ? (
                 <Badge tone="ok"><CheckCircle2 className="mr-1 h-3 w-3" /> aprovado</Badge>
@@ -71,7 +78,15 @@ export default function RunPanel({
             <span className={`text-sm font-medium ${final.approved ? "text-ok" : "text-bad"}`}>
               {final.approved ? "Entrega aprovada" : "Não aprovada no limite de rodadas"}
             </span>
-            <Button variant="outline" className="px-2 py-1 text-xs" onClick={async () => { await navigator.clipboard.writeText(final.output); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
+            <Button variant="outline" className="px-2 py-1 text-xs" onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(final.output);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              } catch {
+                /* sem permissão de área de transferência */
+              }
+            }}>
               {copied ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />} Copiar
             </Button>
           </div>

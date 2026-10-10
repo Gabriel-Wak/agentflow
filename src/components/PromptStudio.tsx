@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Check, Copy, Loader2, Save, Sparkles, Trash2 } from "lucide-react";
 import { api, readNdjson } from "@/lib/fetcher";
 import { PROMPT_TARGETS, type PromptTarget } from "@/lib/prompt-improver";
@@ -33,8 +33,12 @@ export default function PromptStudio() {
   const [justSaved, setJustSaved] = useState(false);
   const { prompt, notes } = split(raw);
 
+  const abortRef = useRef<AbortController | null>(null);
+
   useEffect(() => {
     api<PromptItem[]>("/api/prompts").then(setSaved).catch(() => {});
+    // Saiu da página: cancela a geração (o servidor para de chamar a API).
+    return () => abortRef.current?.abort();
   }, []);
 
   async function improve(e: React.FormEvent) {
@@ -43,32 +47,47 @@ export default function PromptStudio() {
     setError("");
     setRaw("");
     setJustSaved(false);
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
     try {
       const res = await fetch("/api/prompts/improve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: original, target, context }),
+        signal: ac.signal,
       });
       await readNdjson<{ type: string; text?: string; message?: string }>(res, (ev) => {
         if (ev.type === "delta") setRaw((r) => r + ev.text);
         if (ev.type === "error") setError(ev.message ?? "Erro");
       });
     } catch (err) {
-      setError((err as Error).message);
+      if ((err as Error).name !== "AbortError") setError((err as Error).message);
     } finally {
-      setLoading(false);
+      if (abortRef.current === ac) {
+        abortRef.current = null;
+        setLoading(false);
+      }
     }
   }
 
   async function save() {
-    const item = await api<PromptItem>("/api/prompts", { method: "POST", body: JSON.stringify({ original, improved: prompt, notes }) });
-    setSaved((s) => [item, ...s]);
-    setJustSaved(true);
+    try {
+      const item = await api<PromptItem>("/api/prompts", { method: "POST", body: JSON.stringify({ original, improved: prompt, notes }) });
+      setSaved((s) => [item, ...s]);
+      setJustSaved(true);
+    } catch (err) {
+      setError((err as Error).message);
+    }
   }
 
   async function remove(id: string) {
-    await api(`/api/prompts/${id}`, { method: "DELETE" });
-    setSaved((s) => s.filter((p) => p.id !== id));
+    try {
+      await api(`/api/prompts/${id}`, { method: "DELETE" });
+      setSaved((s) => s.filter((p) => p.id !== id));
+    } catch (err) {
+      setError((err as Error).message);
+    }
   }
 
   return (
